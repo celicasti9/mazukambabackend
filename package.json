@@ -16,14 +16,15 @@
     "ethers": "^5.7.2",
     "express": "^4.18.2",
     "mongoose": "^7.0.3",
+    "openai": "^4.78.1",
     "winston": "^3.8.2"
   },
   "devDependencies": {
-    "@types/cors": "^2.8.13",
+    "@types/cors": "^2.8.17",
     "@types/express": "^4.17.17",
     "@types/jest": "^29.5.0",
     "@types/joi": "^17.2.3",
-    "@types/node": "^18.15.11",
+    "@types/node": "^18.19.70",
     "@typescript-eslint/eslint-plugin": "^5.57.1",
     "@typescript-eslint/parser": "^5.57.1",
     "eslint": "^8.37.0",

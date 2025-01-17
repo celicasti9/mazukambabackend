@@ -1,78 +1,30 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
-import mongoose from 'mongoose';
-import dotenv from 'dotenv';
-import { createLogger, format, transports } from 'winston';
 import routes from './routes';
-import { errorHandler } from './middleware/errorHandler';
-import ProposalController from './controllers/ProposalController';
-
-// Load environment variables first
-dotenv.config();
-
-// Initialize the controller
-try {
-  ProposalController.initialize();
-} catch (error) {
-  console.error('Failed to initialize ProposalController:', error);
-  process.exit(1);
-}
-
-const logger = createLogger({
-  format: format.combine(
-    format.timestamp(),
-    format.json()
-  ),
-  transports: [
-    new transports.Console(),
-    new transports.File({ filename: 'error.log', level: 'error' }),
-    new transports.File({ filename: 'combined.log' })
-  ]
-});
 
 const app = express();
+const port = process.env.PORT || 3001;
 
-app.use(cors());
+// Configure CORS to allow requests from the frontend
+app.use(cors({
+  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  methods: ['GET', 'POST'],
+  allowedHeaders: ['Content-Type']
+}));
+
+// Parse JSON request bodies
 app.use(express.json());
+
+// Use routes
 app.use('/api', routes);
-app.use(errorHandler);
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/mazukamba';
-const PORT = process.env.PORT || 3001;
-
-mongoose
-  .connect(MONGODB_URI)
-  .then(() => {
-    logger.info('Connected to MongoDB');
-    
-    const syncInterval = setInterval(() => {
-      ProposalController.syncProposals()
-        .catch((error: Error) => logger.error('Proposal sync failed:', error));
-    }, 60000);
-
-    const server = app.listen(PORT, () => {
-      logger.info(`Server running on port ${PORT}`);
-    });
-
-    process.on('SIGTERM', () => {
-      logger.info('SIGTERM received. Shutting down gracefully...');
-      clearInterval(syncInterval);
-      server.close(() => {
-        logger.info('Process terminated');
-        process.exit(0);
-      });
-    });
-  })
-  .catch((error: Error) => {
-    logger.error('MongoDB connection failed:', error);
-    process.exit(1);
-  });
-
-process.on('unhandledRejection', (error: Error) => {
-  logger.error('Unhandled rejection:', error);
+// Error handling middleware
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error(err.stack);
+  res.status(500).json({ message: err.message || 'Internal Server Error' });
 });
 
-process.on('uncaughtException', (error: Error) => {
-  logger.error('Uncaught exception:', error);
-  process.exit(1);
+app.listen(port, () => {
+  console.log(`Server running on port ${port}`);
 }); 
