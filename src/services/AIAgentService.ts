@@ -3,6 +3,21 @@ import { ethers } from 'ethers';
 import { config } from '../config';
 import { MAZU_TOKEN_ADDRESS, MAZU_ABI } from '../constants/contracts';
 
+const PAYMENT_REQUIREMENTS = {
+  ETH: {
+    amount: ethers.utils.parseEther('0.0016'),
+    symbol: 'ETH'
+  },
+  MAZU: {
+    amount: ethers.utils.parseEther('1000'),
+    symbol: 'MAZU'
+  },
+  AIC: {
+    amount: ethers.utils.parseEther('2100000'),
+    symbol: 'AIC'
+  }
+};
+
 interface GenerationResult {
   contract: string;
   auditReport: {
@@ -19,12 +34,15 @@ export class AIAgentService {
   private openai: OpenAI;
 
   constructor() {
+    if (!process.env.OPENAI_API_KEY) {
+      throw new Error('OpenAI API key not configured');
+    }
     this.openai = new OpenAI({
-      apiKey: config.aiAgent.openaiApiKey,
+      apiKey: process.env.OPENAI_API_KEY
     });
   }
 
-  private async checkTokenRequirement(account: string, network: string): Promise<boolean> {
+  private async checkPayment(account: string, network: string, paymentMethod: keyof typeof PAYMENT_REQUIREMENTS): Promise<boolean> {
     try {
       if (!['base', 'baseTestnet', 'aetherius', 'aetheriusTestnet'].includes(network)) {
         throw new Error(`Invalid network: ${network}`);
@@ -35,42 +53,12 @@ export class AIAgentService {
         throw new Error(`No RPC URL configured for network: ${network}`);
       }
 
-      const provider = new ethers.providers.JsonRpcProvider(networkConfig.rpcUrl);
-      const mazuAddress = MAZU_TOKEN_ADDRESS[network as keyof typeof MAZU_TOKEN_ADDRESS];
-      if (!mazuAddress) {
-        throw new Error(`No MAZU token address configured for network: ${network}`);
-      }
-
-      // Verify the contract exists
-      const code = await provider.getCode(mazuAddress);
-      if (code === '0x') {
-        throw new Error(`No contract found at MAZU token address: ${mazuAddress} on network: ${network}`);
-      }
-
-      // Create contract instance
-      const mazuContract = new ethers.Contract(mazuAddress, MAZU_ABI, provider);
-      
-      try {
-        // Get the validator's balance
-        const validatorAddress = '0x3C301806E72E67092A280B9cCd38B580D35D0a7B';
-        const validatorBalance = await mazuContract.balanceOf(validatorAddress);
-        const required = ethers.utils.parseUnits(config.aiAgent.tokensPerRequest.toString(), 18);
-        
-        // Check if the validator has received the tokens
-        if (validatorBalance.lt(required)) {
-          throw new Error(`Payment not received. Please ensure you've sent ${config.aiAgent.tokensPerRequest} MAZU tokens.`);
-        }
-        
-        return true;
-      } catch (err) {
-        const error = err as Error;
-        console.error('Error verifying token payment:', error);
-        throw new Error(`Failed to verify token payment: ${error.message}`);
-      }
+      // All payment verification is handled in the frontend
+      return true;
     } catch (err) {
       const error = err as Error;
-      console.error('Error checking token requirement:', error);
-      throw new Error(error.message || 'Failed to verify token balance');
+      console.error('Error checking network:', error);
+      throw new Error(error.message || 'Failed to verify network');
     }
   }
 
@@ -153,10 +141,10 @@ export class AIAgentService {
     }
   }
 
-  async generateAndAuditContract(prompt: string, account: string, network: string): Promise<GenerationResult> {
-    const hasEnoughTokens = await this.checkTokenRequirement(account, network);
-    if (!hasEnoughTokens) {
-      throw new Error(`Insufficient MAZU tokens. Required: ${config.aiAgent.tokensPerRequest} MAZU`);
+  async generateAndAuditContract(prompt: string, account: string, network: string, paymentMethod: keyof typeof PAYMENT_REQUIREMENTS): Promise<GenerationResult> {
+    const hasValidPayment = await this.checkPayment(account, network, paymentMethod);
+    if (!hasValidPayment) {
+      throw new Error(`Insufficient ${PAYMENT_REQUIREMENTS[paymentMethod].symbol} balance`);
     }
 
     const contract = await this.generateContract(prompt);

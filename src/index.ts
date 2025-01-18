@@ -8,7 +8,7 @@ const port = process.env.PORT || 3001;
 
 // Configure CORS to allow requests from the frontend
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: ['http://mazukamba.com', 'http://localhost:3000'],
   methods: ['GET', 'POST'],
   allowedHeaders: ['Content-Type']
 }));
